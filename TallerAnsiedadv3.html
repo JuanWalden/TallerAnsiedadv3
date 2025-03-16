@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Respiración Diafragmática</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <!-- CDN para generar PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .breathing-circle {
+            transition: transform 3s ease-in-out;
+        }
+        .breathing-circle.inhale {
+            transform: scale(1.5);
+        }
+        .breathing-circle.exhale {
+            transform: scale(1);
+        }
+        .phase-indicator {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .timer-display {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .time-control {
+            width: 60px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="bg-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-2xl font-bold text-center mb-2 text-blue-800">Respiración Diafragmática</h1>
+        <h2 class="text-xl text-center mb-8 text-blue-600">Taller Centro _Rol. Juan Orta.</h2>
+        
+        <!-- Panel de Control -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <button id="startButton" class="bg-green-500 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-green-600">
+                    Comenzar
+                </button>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <label class="text-gray-700 mr-2">Voz:</label>
+                        <select id="voiceType" class="border border-gray-300 rounded px-2 py-1">
+                            <option value="system">Sistema</option>
+                            <option value="custom">Personalizada</option>
+                        </select>
+                    </div>
+                    <label class="text-gray-700">
+                        <input type="checkbox" id="countdownEnabled" checked class="mr-2">
+                        Cuenta atrás
+                    </label>
+                    <button id="testVoiceButton" class="text-blue-500 hover:text-blue-700">
+                        Probar Voz
+                    </button>
+                </div>
+            </div>
+            <p id="voiceStatus" class="text-sm text-gray-500 mt-2 mb-4">Cargando voces...</p>
+            
+            <!-- Configuración de tiempos -->
+            <div class="flex flex-wrap gap-4 justify-center">
+                <div class="text-center">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Inhala (segundos)</label>
+                    <div class="flex items-center">
+                        <button class="decrease-time bg-gray-200 px-2 py-1 rounded-l" data-target="inhaleTime">-</button>
+                        <input type="number" id="inhaleTime" class="time-control border border-gray-300 py-1" min="1" max="10" value="3">
+                        <button class="increase-time bg-gray-200 px-2 py-1 rounded-r" data-target="inhaleTime">+</button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mantén (segundos)</label>
+                    <div class="flex items-center">
+                        <button class="decrease-time bg-gray-200 px-2 py-1 rounded-l" data-target="holdInTime">-</button>
+                        <input type="number" id="holdInTime" class="time-control border border-gray-300 py-1" min="0" max="10" value="2">
+                        <button class="increase-time bg-gray-200 px-2 py-1 rounded-r" data-target="holdInTime">+</button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Exhala (segundos)</label>
+                    <div class="flex items-center">
+                        <button class="decrease-time bg-gray-200 px-2 py-1 rounded-l" data-target="exhaleTime">-</button>
+                        <input type="number" id="exhaleTime" class="time-control border border-gray-300 py-1" min="1" max="10" value="4">
+                        <button class="increase-time bg-gray-200 px-2 py-1 rounded-r" data-target="exhaleTime">+</button>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Pausa (segundos)</label>
+                    <div class="flex items-center">
+                        <button class="decrease-time bg-gray-200 px-2 py-1 rounded-l" data-target="holdOutTime">-</button>
+                        <input type="number" id="holdOutTime" class="time-control border border-gray-300 py-1" min="0" max="10" value="2">
+                        <button class="increase-time bg-gray-200 px-2 py-1 rounded-r" data-target="holdOutTime">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Grabadora de Voz Personalizada -->
+        <div id="voiceRecorderSection" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Graba tu propia voz</h2>
+            <p class="mb-4 text-gray-600">Graba instrucciones con tu voz para personalizar la experiencia. Presiona cada botón y di la instrucción correspondiente.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="recordInhale" class="border p-4 rounded-lg flex items-center justify-between">
+                    <span class="font-medium">Inhala</span>
+                    <div>
+                        <button class="record-button bg-red-500 text-white px-3 py-1 rounded mr-2" data-phase="inhale">Grabar</button>
+                        <button class="play-button bg-blue-500 text-white px-3 py-1 rounded opacity-50" data-phase="inhale" disabled>Reproducir</button>
+                    </div>
+                </div>
+                
+                <div id="recordManten" class="border p-4 rounded-lg flex items-center justify-between">
+                    <span class="font-medium">Mantén</span>
+                    <div>
+                        <button class="record-button bg-red-500 text-white px-3 py-1 rounded mr-2" data-phase="manten">Grabar</button>
+                        <button class="play-button bg-blue-500 text-white px-3 py-1 rounded opacity-50" data-phase="manten" disabled>Reproducir</button>
+                    </div>
+                </div>
+                
+                <div id="recordExhale" class="border p-4 rounded-lg flex items-center justify-between">
+                    <span class="font-medium">Exhala</span>
+                    <div>
+                        <button class="record-button bg-red-500 text-white px-3 py-1 rounded mr-2" data-phase="exhale">Grabar</button>
+                        <button class="play-button bg-blue-500 text-white px-3 py-1 rounded opacity-50" data-phase="exhale" disabled>Reproducir</button>
+                    </div>
+                </div>
+                
+                <div id="recordPausa" class="border p-4 rounded-lg flex items-center justify-between">
+                    <span class="font-medium">Pausa</span>
+                    <div>
+                        <button class="record-button bg-red-500 text-white px-3 py-1 rounded mr-2" data-phase="pausa">Grabar</button>
+                        <button class="play-button bg-blue-500 text-white px-3 py-1 rounded opacity-50" data-phase="pausa" disabled>Reproducir</button>
+                    </div>
+                </div>
+                
+                <div id="recordComenzamos" class="border p-4 rounded-lg flex items-center justify-between">
+                    <span class="font-medium">Comenzamos</span>
+                    <div>
+                        <button class="record-button bg-red-500 text-white px-3 py-1 rounded mr-2" data-phase="comenzamos">Grabar</button>
+                        <button class="play-button bg-blue-500 text-white px-3 py-1 rounded opacity-50" data-phase="comenzamos" disabled>Reproducir</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6">
+                <button id="deleteAllRecordings" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+                    Borrar todas las grabaciones
+                </button>
+            </div>
+        </div>
+
+        <!-- Círculo de Respiración -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-col justify-center items-center h-64 relative">
+                <div id="timerDisplay" class="timer-display text-4xl mb-4">-</div>
+                <div id="breathingCircle" class="breathing-circle w-32 h-32 bg-blue-400 rounded-full flex items-center justify-center">
+                    <span id="phaseText" class="text-white text-xl font-bold">Preparados</span>
+                </div>
+            </div>
+            
+            <!-- Indicadores de Fase -->
+            <div class="flex justify-center space-x-4 mt-6">
+                <div id="inhalePhase" class="phase-indicator opacity-50 text-center">
+                    <div class="w-4 h-4 bg-blue-500 rounded-full mx-auto mb-2"></div>
+                    <span class="text-sm">Inhala</span>
+                    <span id="inhaleTimeDisplay" class="text-xs block text-gray-500">3s</span>
+                </div>
+                <div id="holdInPhase" class="phase-indicator opacity-50 text-center">
+                    <div class="w-4 h-4 bg-green-500 rounded-full mx-auto mb-2"></div>
+                    <span class="text-sm">Mantén</span>
+                    <span id="holdInTimeDisplay" class="text-xs block text-gray-500">2s</span>
+                </div>
+                <div id="exhalePhase" class="phase-indicator opacity-50 text-center">
+                    <div class="w-4 h-4 bg-indigo-500 rounded-full mx-auto mb-2"></div>
+                    <span class="text-sm">Exhala</span>
+                    <span id="exhaleTimeDisplay" class="text-xs block text-gray-500">4s</span>
+                </div>
+                <div id="holdOutPhase" class="phase-indicator opacity-50 text-center">
+                    <div class="w-4 h-4 bg-purple-500 rounded-full mx-auto mb-2"></div>
+                    <span class="text-sm">Pausa</span>
+                    <span id="holdOutTimeDisplay" class="text-xs block text-gray-500">2s</span>
+                </div>
+            </div>
+
+            <!-- Estadísticas de Sesión Actual -->
+            <div class="mt-6 text-center">
+                <p class="text-gray-700">Ciclos completados: <span id="cyclesCount">0</span></p>
+                <p class="text-gray-700">Tiempo de sesión: <span id="sessionTime">00:00</span></p>
+            </div>
+        </div>
+
+        <!-- Historial de Sesiones -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Historial de Sesiones</h2>
+                <div class="flex space-x-2">
+                    <button id="clearHistoryButton" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">
+                        Borrar Historial
+                    </button>
+                    <button id="savePdfButton" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm">
+                        Guardar como PDF
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto" id="historyTableContainer">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duración</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ciclos</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Configuración</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionsHistory" class="bg-white divide-y divide-gray-200">
+                        <!-- Las sesiones se añadirán aquí dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Instrucciones -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Instrucciones</h2>
+            <ul class="list-disc pl-5 space-y-2">
+                <li>Siéntate cómodamente o túmbate boca arriba</li>
+                <li>Coloca una mano en el pecho y otra en el abdomen</li>
+                <li>Personaliza los tiempos según tus necesidades</li>
+                <li>Sigue el ritmo de la animación, la voz guía y la cuenta atrás</li>
+                <li>Al inspirar, expande el abdomen (debe moverse la mano inferior)</li>
+                <li>Al exhalar, el abdomen debe descender suavemente</li>
+                <li>Tus sesiones quedarán registradas en el historial</li>
+                <li>Puedes grabar tu propia voz seleccionando "Personalizada" en el tipo de voz</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Variables de estado
+        let isBreathing = false;
+        let synth = window.speechSynthesis;
+        let voices = [];
+        let selectedVoice = null;
+        let cyclesCount = 0;
+        let sessionStartTime = null;
+        let sessionInterval = null;
+        let currentCountdown = 0;
+        let currentPhase = '';
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let currentRecordingPhase = null;
+        let customVoiceRecordings = {};
+
+        // Variables para control de grabación
+        let stream = null;
+
+        // Elementos del DOM
+        const startButton = document.getElementById('startButton');
+        const testVoiceButton = document.getElementById('testVoiceButton');
+        const voiceTypeSelect = document.getElementById('voiceType');
+        const countdownEnabledCheckbox = document.getElementById('countdownEnabled');
+        const breathingCircle = document.getElementById('breathingCircle');
+        const phaseText = document.getElementById('phaseText');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const cyclesCountElement = document.getElementById('cyclesCount');
+        const sessionTimeElement = document.getElementById('sessionTime');
+        const sessionsHistoryElement = document.getElementById('sessionsHistory');
+        const voiceRecorderSection = document.getElementById('voiceRecorderSection');
+        const deleteAllRecordingsButton = document.getElementById('deleteAllRecordings');
+
+        // Elementos de tiempo
+        const inhaleTimeInput = document.getElementById('inhaleTime');
+        const holdInTimeInput = document.getElementById('holdInTime');
+        const exhaleTimeInput = document.getElementById('exhaleTime');
+        const holdOutTimeInput = document.getElementById('holdOutTime');
+        
+        // Displays de tiempo en los indicadores
+        const inhaleTimeDisplay = document.getElementById('inhaleTimeDisplay');
+        const holdInTimeDisplay = document.getElementById('holdInTimeDisplay');
+        const exhaleTimeDisplay = document.getElementById('exhaleTimeDisplay');
+        const holdOutTimeDisplay = document.getElementById('holdOutTimeDisplay');
+
+        // Cargar grabaciones personalizadas si existen
+        function loadCustomVoiceRecordings() {
+            try {
+                const savedRecordings = localStorage.getItem('customVoiceRecordings');
+                if (savedRecordings) {
+                    customVoiceRecordings = JSON.parse(savedRecordings);
+                    
+                    // Habilitar los botones de reproducción si hay grabaciones
+                    Object.keys(customVoiceRecordings).forEach(phase => {
+                        const playButton = document.querySelector(`.play-button[data-phase="${phase}"]`);
+                        if (playButton) {
+                            playButton.disabled = false;
+                            playButton.classList.remove('opacity-50');
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error al cargar grabaciones de voz:', error);
+            }
+        }
+
+        // Guardar grabaciones personalizadas
+        function saveCustomVoiceRecordings() {
+            try {
+                localStorage.setItem('customVoiceRecordings', JSON.stringify(customVoiceRecordings));
+            } catch (error) {
+                console.error('Error al guardar grabaciones de voz:', error);
+            }
+        }
+
+        // Mostrar/ocultar sección de grabadora según la selección
+        voiceTypeSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                voiceRecorderSection.classList.remove('hidden');
+            } else {
+                voiceRecorderSection.classList.add('hidden');
+            }
+        });
+
+        // Iniciar grabación de voz
+        async function startRecording(phase) {
+            if (isRecording) return;
+            
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                currentRecordingPhase = phase;
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // Cambiado a webm
+                    
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        customVoiceRecordings[currentRecordingPhase] = reader.result;
+                        saveCustomVoiceRecordings();
+                        
+                        const playButton = document.querySelector(`.play-button[data-phase="${currentRecordingPhase}"]`);
+                        if (playButton) {
+                            playButton.disabled = false;
+                            playButton.classList.remove('opacity-50');
+                        }
+                        
+                        // Mostrar feedback visual
+                        const recordButton = document.querySelector(`.record-button[data-phase="${currentRecordingPhase}"]`);
+                        if (recordButton) {
+                            recordButton.classList.add('bg-green-500');
+                            setTimeout(() => {
+                                recordButton.classList.remove('bg-green-500');
+                                recordButton.classList.add('bg-red-500');
+                            }, 1000);
+                        }
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                        stream = null;
+                    }
+                    
+                    isRecording = false;
+                    updateRecordButtonState(currentRecordingPhase, false);
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                updateRecordButtonState(phase, true);
+                
+                // Detener automáticamente después de 3 segundos
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Error al acceder al micrófono:', error);
+                alert('No se pudo acceder al micrófono. Asegúrate de dar permiso para grabar audio.');
+                updateRecordButtonState(phase, false);
+            }
+        }
+        
+        // Función auxiliar para actualizar el estado visual del botón de grabación
+        function updateRecordButtonState(phase, isRecording) {
+            const recordButton = document.querySelector(`.record-button[data-phase="${phase}"]`);
+            if (recordButton) {
+                if (isRecording) {
+                    recordButton.textContent = 'Grabando...';
+                    recordButton.classList.remove('bg-red-500');
+                    recordButton.classList.add('bg-gray-500');
+                } else {
+                    recordButton.textContent = 'Grabar';
+                    recordButton.classList.remove('bg-gray-500');
+                    recordButton.classList.add('bg-red-500');
+                }
+            }
+        }
+
+        // Reproducir grabación
+        function playRecording(phase) {
+            if (customVoiceRecordings[phase]) {
+                const audio = new Audio(customVoiceRecordings[phase]);
+                audio.play();
+            }
+        }
+
+        // Borrar todas las grabaciones
+        function deleteAllRecordings() {
+            if (confirm('¿Estás seguro de que quieres borrar todas las grabaciones de voz?')) {
+                customVoiceRecordings = {};
+                localStorage.removeItem('customVoiceRecordings');
+                
+                // Deshabilitar todos los botones de reproducción
+                document.querySelectorAll('.play-button').forEach(button => {
+                    button.disabled = true;
+                    button.classList.add('opacity-50');
+                });
+                
+                alert('Todas las grabaciones han sido borradas');
+            }
+        }
+
+        // Configurar eventos de grabación
+        document.querySelectorAll('.record-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const phase = button.getAttribute('data-phase');
+                if (isRecording) {
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                } else {
+                    startRecording(phase);
+                }
+            });
+        });
+
+        // Configurar eventos de reproducción
+        document.querySelectorAll('.play-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const phase = button.getAttribute('data-phase');
+                playRecording(phase);
+            });
+        });
+
+        // Evento para borrar todas las grabaciones
+        deleteAllRecordingsButton.addEventListener('click', deleteAllRecordings);
+
+        // Botones de incremento/decremento de tiempo
+        document.querySelectorAll('.increase-time').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const currentValue = parseInt(input.value);
+                if (currentValue < parseInt(input.max)) {
+                    input.value = currentValue + 1;
+                    updateTimeDisplays();
+                }
+            });
+        });
+
+        document.querySelectorAll('.decrease-time').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const currentValue = parseInt(input.value);
+                if (currentValue > parseInt(input.min)) {
+                    input.value = currentValue - 1;
+                    updateTimeDisplays();
+                }
+            });
+        });
+
+        // Actualizar displays cuando se cambian valores de tiempo
+        [inhaleTimeInput, holdInTimeInput, exhaleTimeInput, holdOutTimeInput].forEach(input => {
+            input.addEventListener('change', updateTimeDisplays);
+        });
+
+        function updateTimeDisplays() {
+            inhaleTimeDisplay.textContent = `${inhaleTimeInput.value}s`;
+            holdInTimeDisplay.textContent = `${holdInTimeInput.value}s`;
+            exhaleTimeDisplay.textContent = `${exhaleTimeInput.value}s`;
+            holdOutTimeDisplay.textContent = `${holdOutTimeInput.value}s`;
+        }
+
+        // Configurar voz en español
+        function setVoice() {
+            voices = synth.getVoices();
+            selectedVoice = voices.find(voice => voice.lang.startsWith('es')) || voices[0];
+            voiceStatus.textContent = selectedVoice ? 'Voz lista: ' + selectedVoice.name : 'No hay voces disponibles';
+        }
+
+        // Cargar voces al inicio con mejor manejo
+        function initVoices() {
+            // Intento inmediato de cargar voces
+            setVoice();
+            
+            // Configurar el evento onvoiceschanged para cuando las voces estén disponibles
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = setVoice;
+            }
+            
+            // Si aún no hay voces, intentar nuevamente después de un breve retraso
+            if (!selectedVoice) {
+                setTimeout(() => {
+                    setVoice();
+                    // Si todavía no hay voces después del retraso, mostrar mensaje
+                    if (!selectedVoice && voices.length === 0) {
+                        voiceStatus.textContent = 'No se pudieron cargar las voces. Intenta recargar la página.';
+                    }
+                }, 1000);
+            }
+        }
+        
+        // Iniciar el proceso de carga de voces
+        initVoices();
+
+        // Cargar historial de sesiones
+        function loadSessionsHistory() {
+            try {
+                const sessions = JSON.parse(localStorage.getItem('breathingSessions') || '[]');
+                sessionsHistoryElement.innerHTML = '';
+                
+                if (sessions.length === 0) {
+                    const emptyRow = document.createElement('tr');
+                    emptyRow.innerHTML = `
+                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                            No hay sesiones registradas
+                        </td>
+                    `;
+                    sessionsHistoryElement.appendChild(emptyRow);
+                    return;
+                }
+
+                sessions.forEach(session => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${session.date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${session.duration}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${session.cycles}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${session.config}</td>
+                    `;
+                    sessionsHistoryElement.appendChild(row);
+                });
+            } catch (error) {
+                console.log("No se puede acceder al historial de sesiones en este entorno.");
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                        El historial estará disponible cuando uses la app en tu navegador
+                    </td>
+                `;
+                sessionsHistoryElement.appendChild(emptyRow);
+            }
+        }
+
+        // Guardar una sesión en el historial
+        function saveSession(duration, cycles) {
+            try {
+                const now = new Date();
+                const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+                const config = `Inh: ${inhaleTimeInput.value}s, Man: ${holdInTimeInput.value}s, Exh: ${exhaleTimeInput.value}s, Pau: ${holdOutTimeInput.value}s`;
+                
+                const session = {
+                    date: dateStr,
+                    duration: duration,
+                    cycles: cycles,
+                    config: config
+                };
+                
+                const sessions = JSON.parse(localStorage.getItem('breathingSessions') || '[]');
+                sessions.unshift(session); // Añadir al principio
+                
+                // Limitar a 20 sesiones guardadas
+                if (sessions.length > 20) {
+                    sessions.pop();
+                }
+                
+                localStorage.setItem('breathingSessions', JSON.stringify(sessions));
+                loadSessionsHistory();
+            } catch (error) {
+                console.log("No se puede guardar la sesión en este entorno.");
+            }
+        }
+
+        // Función para hablar con voz personalizada o del sistema
+        function speak(text) {
+            // Si está seleccionada la voz personalizada y existe una grabación para esta fase
+            if (voiceTypeSelect.value === 'custom') {
+                let phase = '';
+                
+                // Mapear el texto a la fase correspondiente
+                if (text === 'Inhala') phase = 'inhale';
+                else if (text === 'Mantén') phase = 'manten';
+                else if (text === 'Exhala') phase = 'exhale';
+                else if (text === 'Pausa') phase = 'pausa';
+                else if (text === 'Comenzamos') phase = 'comenzamos';
+                
+                // Si existe una grabación para esta fase, reproducirla
+                if (phase && customVoiceRecordings[phase]) {
+                    const audio = new Audio(customVoiceRecordings[phase]);
+                    audio.play();
+                    return;
+                }
+            }
+            
+            // Si no hay grabación o se seleccionó la voz del sistema
+            if (selectedVoice) {
+                synth.cancel(); // Cancelar cualquier voz anterior
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.voice = selectedVoice;
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                utterance.onerror = (event) => console.error('Error en síntesis de voz:', event);
+                synth.speak(utterance);
+            }
+        }
+
+        // Probar voz (sistema o personalizada)
+        function testVoice() {
+            speak("Comenzamos");
+        }
+
+        // Actualizar indicadores de fase
+        function updatePhaseIndicator(phase) {
+            currentPhase = phase;
+            const phases = ['inhalePhase', 'holdInPhase', 'exhalePhase', 'holdOutPhase'];
+            phases.forEach(p => {
+                document.getElementById(p).style.opacity = p === phase ? '1' : '0.5';
+            });
+        }
+
+        // Función para actualizar el tiempo de sesión
+        function updateSessionTime() {
+            if (!sessionStartTime) return;
+            
+            const now = new Date();
+            const elapsedMillis = now - sessionStartTime;
+            const minutes = Math.floor(elapsedMillis / 60000);
+            const seconds = Math.floor((elapsedMillis % 60000) / 1000);
+            
+            sessionTimeElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Función para formatear el tiempo de sesión
+        function formatSessionTime() {
+            return sessionTimeElement.textContent;
+        }
+
+        // Temporizador para esperar con cuenta regresiva (sin pronunciar números)
+        const waitWithCountdown = async (ms, phase) => {
+            const seconds = ms / 1000;
+            currentCountdown = seconds;
+            
+            return new Promise(resolve => {
+                const interval = setInterval(() => {
+                    if (!isBreathing) {
+                        clearInterval(interval);
+                        timerDisplay.textContent = '-';
+                        resolve();
+                        return;
+                    }
+                    
+                    if (countdownEnabledCheckbox.checked) {
+                        timerDisplay.textContent = currentCountdown;
+                        // Ya no pronunciamos los números durante la cuenta regresiva
+                    } else {
+                        timerDisplay.textContent = '-';
+                    }
+                    
+                    currentCountdown--;
+                    
+                    if (currentCountdown < 0) {
+                        clearInterval(interval);
+                        resolve();
+                    }
+                }, 1000);
+            });
+        };
+
+        // Ciclo de respiración
+        async function breathingCycle() {
+            while (isBreathing) {
+                // INHALA
+                if (!isBreathing) break;
+                speak("Inhala");
+                phaseText.textContent = "Inhala";
+                breathingCircle.classList.add('inhale');
+                updatePhaseIndicator('inhalePhase');
+                await waitWithCountdown(inhaleTimeInput.value * 1000, 'inhale');
+
+                // MANTÉN 
+                if (!isBreathing) break;
+                if (parseInt(holdInTimeInput.value) > 0) {
+                    speak("Mantén");
+                    phaseText.textContent = "Mantén";
+                    updatePhaseIndicator('holdInPhase');
+                    await waitWithCountdown(holdInTimeInput.value * 1000, 'holdIn');
+                }
+
+                // EXHALA
+                if (!isBreathing) break;
+                speak("Exhala");
+                phaseText.textContent = "Exhala";
+                breathingCircle.classList.remove('inhale');
+                updatePhaseIndicator('exhalePhase');
+                await waitWithCountdown(exhaleTimeInput.value * 1000, 'exhale');
+
+                // PAUSA
+                if (!isBreathing) break;
+                if (parseInt(holdOutTimeInput.value) > 0) {
+                    speak("Pausa");
+                    phaseText.textContent = "Pausa";
+                    updatePhaseIndicator('holdOutPhase');
+                    await waitWithCountdown(holdOutTimeInput.value * 1000, 'holdOut');
+                }
+
+                // Incrementar contador de ciclos
+                if (isBreathing) {
+                    cyclesCount++;
+                    cyclesCountElement.textContent = cyclesCount;
+                }
+            }
+        }
+
+        // Alternar respiración
+        function toggleBreathing() {
+            if (!isBreathing) {
+                // Iniciar sesión
+                startButton.textContent = 'Detener';
+                startButton.classList.replace('bg-green-500', 'bg-red-500');
+                startButton.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
+                isBreathing = true;
+                cyclesCount = 0;
+                cyclesCountElement.textContent = '0';
+                sessionStartTime = new Date();
+                
+                // Actualizar el tiempo de sesión cada segundo
+                sessionInterval = setInterval(updateSessionTime, 1000);
+                
+                speak("Comenzamos");
+                breathingCycle();
+            } else {
+                // Terminar sesión
+                isBreathing = false;
+                clearInterval(sessionInterval);
+                
+                // Guardar la sesión
+                const duration = formatSessionTime();
+                saveSession(duration, cyclesCount);
+                
+                // Resetear interfaz
+                startButton.textContent = 'Comenzar';
+                startButton.classList.replace('bg-red-500', 'bg-green-500');
+                startButton.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+                phaseText.textContent = "Preparados";
+                breathingCircle.classList.remove('inhale');
+                updatePhaseIndicator('');
+                timerDisplay.textContent = '-';
+                synth.cancel();
+            }
+        }
+
+        // Función para borrar el historial
+        function clearHistory() {
+            if (confirm('¿Estás seguro de que quieres borrar todo el historial de sesiones?')) {
+                try {
+                    localStorage.removeItem('breathingSessions');
+                    loadSessionsHistory();
+                    alert('Historial borrado con éxito');
+                } catch (error) {
+                    alert('No se pudo borrar el historial: ' + error.message);
+                }
+            }
+        }
+
+        // Función para guardar el historial como PDF
+        function saveHistoryAsPDF() {
+            const element = document.getElementById('historyTableContainer');
+            
+            if (!element) {
+                alert('No se encontró el contenido para exportar');
+                return;
+            }
+            
+            const opt = {
+                margin: 10,
+                filename: 'historial_respiracion_diafragmatica.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            // Añadir título al PDF
+            const title = document.createElement('div');
+            title.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h1 style="font-size: 18px; font-weight: bold;">Historial de Respiración Diafragmática</h1>
+                    <h2 style="font-size: 14px;">Taller Centro _Rol. Juan Orta.</h2>
+                    <p style="font-size: 12px;">Generado el: ${new Date().toLocaleString()}</p>
+                </div>
+            `;
+            
+            // Clonar la tabla para no modificar la original
+            const tableClone = element.cloneNode(true);
+            
+            // Crear un contenedor temporal para el PDF
+            const pdfContainer = document.createElement('div');
+            pdfContainer.appendChild(title);
+            pdfContainer.appendChild(tableClone);
+            pdfContainer.style.padding = '20px';
+            
+            // Ocultar el contenedor temporal
+            pdfContainer.style.position = 'absolute';
+            pdfContainer.style.left = '-9999px';
+            document.body.appendChild(pdfContainer);
+            
+            // Generar el PDF
+            html2pdf().set(opt).from(pdfContainer).save().then(() => {
+                // Limpiar después de generar
+                document.body.removeChild(pdfContainer);
+            });
+        }
+
+        // Añadir eventos para clic y toque
+        startButton.addEventListener('click', toggleBreathing);
+        startButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            toggleBreathing();
+        });
+        testVoiceButton.addEventListener('click', testVoice);
+        testVoiceButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            testVoice();
+        });
+        
+        // Eventos para los nuevos botones
+        document.getElementById('clearHistoryButton').addEventListener('click', clearHistory);
+        document.getElementById('savePdfButton').addEventListener('click', saveHistoryAsPDF);
+
+        // Inicializar
+        updateTimeDisplays();
+        loadSessionsHistory();
+        loadCustomVoiceRecordings();
+    </script>
+</body>
+</html>
